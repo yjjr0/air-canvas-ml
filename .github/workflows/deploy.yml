@@ -1,0 +1,58 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install (postinstall copies the ONNX Runtime + MediaPipe WASM into public/)
+        run: npm ci
+
+      - name: Unit tests, incl. TypeScript-vs-Python feature and filter parity
+        run: npm test
+
+      - name: Build (downloads the MediaPipe hand model, type-checks, bundles)
+        run: |
+          repo="${GITHUB_REPOSITORY#*/}"
+          # Project sites live under /<repo>/; a <user>.github.io repo is served from /.
+          if [[ "$repo" == *.github.io ]]; then export VITE_BASE=/; else export VITE_BASE="/$repo/"; fi
+          echo "Building with base $VITE_BASE"
+          npm run build
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

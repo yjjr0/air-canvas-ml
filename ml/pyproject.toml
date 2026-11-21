@@ -1,0 +1,14 @@
+[project]
+name = "air-canvas-ml"
+version = "1.0.0"
+description = "Gesture model training for Air Canvas: synthetic hand generator, 1D-CNN, ONNX export"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = ["slow: exports an ONNX model"]
+filterwarnings = ["ignore::DeprecationWarning", "ignore::UserWarning"]
+
+[tool.ruff]
+line-length = 140
