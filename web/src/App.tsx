@@ -1,14 +1,15 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { AirCanvas } from './components/AirCanvas';
+import { AirCanvasEngine } from './engine/engine';
 import { CollectorPanel } from './components/CollectorPanel';
 import { GestureGuide } from './components/GestureGuide';
 import { HowItWorks } from './components/HowItWorks';
+import Maybe from './maybe';
 import { ProbabilityStreaks } from './components/ProbabilityStreaks';
+import { REPO_URL } from './config';
 import { TeachPanel } from './components/TeachPanel';
 import { TelemetryHUD } from './components/TelemetryHUD';
 import { Toolbar } from './components/Toolbar';
-import { REPO_URL } from './config';
-import { AirCanvasEngine } from './engine/engine';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useEngineSnapshot } from './hooks/useEngine';
 
 type Tab = 'gestures' | 'teach' | 'collect';
@@ -19,54 +20,19 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const changeTab = () => {
+    const hash = window.location.hash.slice(1);
+    return hash === 'teach' || hash === 'collect' ? hash : 'gestures';
+}
 
 export function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const inkRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const [engine, setEngine] = useState<AirCanvasEngine | null>(null);
-  const snap = useEngineSnapshot(engine);
   const [reducedMotion] = useState(prefersReducedMotion);
-  const [tab, setTab] = useState<Tab>(() => {
-    const hash = window.location.hash.slice(1);
-    return hash === 'teach' || hash === 'collect' ? hash : 'gestures';
-  });
-
-  useEffect(() => {
-    const [video, ink, overlay] = [videoRef.current, inkRef.current, overlayRef.current];
-    if (!video || !ink || !overlay) return;
-    const instance = new AirCanvasEngine({ video, ink, overlay });
-    setEngine(instance);
-    let alive = true;
-    void instance.init().then(() => {
-      if (alive && !prefersReducedMotion()) void instance.startDemo();
-    });
-    return () => {
-      alive = false;
-      instance.dispose();
-      setEngine(null);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!engine) return;
-    const onKey = (ev: KeyboardEvent) => {
-      if ((ev.target as HTMLElement).closest('input, select, textarea, [contenteditable="true"]')) return;
-      if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
-      const key = ev.key.toLowerCase();
-      if (key === 'z') {
-        if (ev.shiftKey) engine.redo();
-        else engine.undo();
-        ev.preventDefault();
-      } else if (key === 'y') {
-        engine.redo();
-      } else if (key === 'h') {
-        engine.toggleHand();
-      }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [engine]);
+  const [tab, setTab] = useState<Tab>(changeTab);
+  const snap = useEngineSnapshot(engine);
 
   const onTabKey = (ev: ReactKeyboardEvent<HTMLButtonElement>) => {
     const i = TABS.findIndex((t) => t.id === tab);
@@ -76,22 +42,48 @@ export function App() {
     setTab(TABS[next].id);
     document.getElementById(`tab-${TABS[next].id}`)?.focus();
   };
+  
+  const engineLifecycle = () =>
+    Maybe.of({ video: videoRef.current, ink: inkRef.current, overlay: overlayRef.current })
+      .map(({ video, ink, overlay }) => video && ink && overlay ? { video, ink, overlay } : null)
+      .map((elements) => {
+        const instance = new AirCanvasEngine(elements);
+        setEngine(instance);
+        let alive = true;
+        void instance.init().then(() => {
+          if (alive && !prefersReducedMotion()) void instance.startDemo();
+        });
+        return () => { alive = false; instance.dispose(); setEngine(null); };
+      })
+      .get();
+
+  const keyboardShortcuts = () =>
+    Maybe.of(engine)
+      .map((eng) => {
+        const actions = new Map<string, (e: KeyboardEvent) => void>([
+          ['z', (e) => { if (e.shiftKey) eng.redo(); else eng.undo(); e.preventDefault(); }],
+          ['y', () => eng.redo()],
+          ['h', () => eng.toggleHand()],
+        ]);
+
+        const onKey = (ev: KeyboardEvent) =>
+          Maybe.of(ev)
+            .filter((e) => !(e.target as HTMLElement).closest('input, select, textarea, [contenteditable="true"]'))
+            .filter((e) => !e.metaKey && !e.ctrlKey && !e.altKey)
+            .map((e) => actions.get(e.key.toLowerCase()))
+            .ifPresent((action) => action(ev));
+
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      })
+      .get();
+
+  useEffect(engineLifecycle, []);
+  useEffect(keyboardShortcuts, [engine]);
 
   return (
     <div className="app">
-      <header className="masthead">
-        <div>
-          <h1 className="wordmark">Air Canvas</h1>
-          <p className="lede">
-            Draw glowing strokes in mid-air using hand gestures!
-            A custom gesture model trained in PyTorch and exported to ONNX running entirely in the browser.<br></br>
-            Privacy Note: There is no server and the camera feed can be seen by you only.
-          </p>
-        </div>
-        <a className="repo-link" href={REPO_URL}>
-          Source on GitHub
-        </a>
-      </header>
+      <Header />
 
       <main className="workspace">
         <section className="stage-column" aria-label="Canvas">
@@ -131,12 +123,35 @@ export function App() {
       </main>
 
       <HowItWorks meta={snap.meta} />
-
-      <footer className="footer">
-        <p>
-          Air Canvas. No video, landmarks or drawing are uploaded anywhere.
-        </p>
-      </footer>
+      <Footer />
     </div>
+  );
+}
+
+function Header() {
+  return (
+    <header className="masthead">
+      <div>
+        <h1 className="wordmark">Air Canvas</h1>
+        <p className="lede">
+          Draw glowing strokes in mid-air using hand gestures!
+          A custom gesture model trained in PyTorch and exported to ONNX running entirely in the browser.<br></br>
+          Privacy Note: There is no server and the camera feed can be seen by you only.
+        </p>
+      </div>
+      <a className="repo-link" href={REPO_URL}>
+        Source on GitHub
+      </a>
+    </header>
+  );
+}
+
+function Footer() {
+  return (
+    <footer className="footer">
+      <p>
+        Air Canvas. No video, landmarks or drawing are uploaded anywhere.
+      </p>
+    </footer>
   );
 }

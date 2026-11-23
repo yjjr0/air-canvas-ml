@@ -653,7 +653,6 @@ def generate_dataset(
     n_subjects: int = 48,
     seed: int = 0,
 ) -> list[dict]:
-    """Synthetic clips; ``group`` = virtual subject id, used for leakage-free splits."""
     rng = np.random.default_rng(seed)
     subjects = [sample_subject(rng) for _ in range(n_subjects)]
     clips: list[dict] = []
