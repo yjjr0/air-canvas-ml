@@ -1,5 +1,5 @@
-import { useSyncExternalStore } from 'react';
 import type { AirCanvasEngine, EngineSnapshot } from '../engine/engine';
+import { useSyncExternalStore } from 'react';
 
 const noopSubscribe = () => () => undefined;
 const EMPTY: EngineSnapshot = {

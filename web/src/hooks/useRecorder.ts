@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AirCanvasEngine } from '../engine/engine';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type RecorderPhase = 'idle' | 'countdown' | 'recording';
 
@@ -9,7 +9,13 @@ export interface RecorderState {
   progress: number;
 }
 
-export type RecordResult = { ok: true; frames: Float32Array[] } | { ok: false; reason: string };
+export type RecordResult = {
+  ok: true;
+  frames: Float32Array[]
+} | {
+  ok: false;
+  reason: string
+};
 
 const NO_HAND_TIMEOUT_MS = 4000;
 
@@ -26,9 +32,11 @@ export function useRecorder(engine: AirCanvasEngine | null) {
           resolve({ ok: false, reason: 'The model is still loading.' });
           return;
         }
+
         let cancelled = false;
         let timer: ReturnType<typeof setTimeout> | undefined;
         let unsubscribe: (() => void) | undefined;
+ 
         const finish = (result: RecordResult) => {
           cancelled = true;
           clearTimeout(timer);
@@ -37,6 +45,7 @@ export function useRecorder(engine: AirCanvasEngine | null) {
           setState({ phase: 'idle', countdown: 0, progress: 0 });
           resolve(result);
         };
+
         cancelRef.current = () => finish({ ok: false, reason: 'Recording cancelled.' });
 
         const startCapture = () => {
@@ -61,6 +70,7 @@ export function useRecorder(engine: AirCanvasEngine | null) {
           setState({ phase: 'countdown', countdown: left, progress: 0 });
           timer = setTimeout(() => tick(left - 1), 1000);
         };
+        
         tick(countdownSec);
       }),
     [engine],

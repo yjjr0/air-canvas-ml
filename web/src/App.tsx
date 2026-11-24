@@ -19,19 +19,19 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'collect', label: 'Collect data' },
 ];
 
-const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const changeTab = () => {
     const hash = window.location.hash.slice(1);
     return hash === 'teach' || hash === 'collect' ? hash : 'gestures';
 }
+const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const inkRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const [engine, setEngine] = useState<AirCanvasEngine | null>(null);
-  const [reducedMotion] = useState(prefersReducedMotion);
   const [tab, setTab] = useState<Tab>(changeTab);
+  const [reducedMotion] = useState(prefersReducedMotion);
   const snap = useEngineSnapshot(engine);
 
   const onTabKey = (ev: ReactKeyboardEvent<HTMLButtonElement>) => {
@@ -87,8 +87,14 @@ export function App() {
 
       <main className="workspace">
         <section className="stage-column" aria-label="Canvas">
-          <AirCanvas engine={engine} snap={snap} reducedMotion={reducedMotion} refs={{ video: videoRef, ink: inkRef, overlay: overlayRef }} />
-          <Toolbar engine={engine} snap={snap} />
+          <AirCanvas
+            engine={engine}
+            snap={snap}
+            reducedMotion={reducedMotion} 
+            refs={{ video: videoRef, ink: inkRef, overlay: overlayRef }} />
+          <Toolbar
+            engine={engine}
+            snap={snap} />
         </section>
 
         <aside className="side" aria-label="Model and tools">

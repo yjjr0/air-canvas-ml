@@ -2,11 +2,13 @@ import type { AirCanvasEngine, EngineSnapshot } from '../engine/engine';
 import { GESTURES, type BaseLabel } from '../config';
 import Maybe from '../maybe';
 import type { RefObject } from 'react';
+
 export interface StageRefs {
   video: RefObject<HTMLVideoElement | null>;
   ink: RefObject<HTMLCanvasElement | null>;
   overlay: RefObject<HTMLCanvasElement | null>;
 }
+
 interface Props {
   engine: AirCanvasEngine | null;
   snap: EngineSnapshot;
@@ -25,7 +27,7 @@ type StageCtaProps = {
 export function AirCanvas({ engine, snap, reducedMotion, refs }: Props) {
   const live = snap.mode === 'camera';
   const busy = snap.mode === 'loading' || snap.mode === 'camera-starting';
-
+  
   const SOURCE_TEXT = new Map<EngineSnapshot['mode'], (snap: EngineSnapshot) => string>([
     ['demo', () => 'Live Demo'],
     ['camera', (snap) => (snap.handPresent ? 'Tracking your hand' : 'Hold one hand up to the camera')],
@@ -59,7 +61,7 @@ export function AirCanvas({ engine, snap, reducedMotion, refs }: Props) {
           {snap.toast.text}
         </p>
       )}
-
+      
       <StageCta
         engine={engine}
         snap={snap}
@@ -91,7 +93,7 @@ function ActiveGesture({ snap }: { snap: EngineSnapshot }) {
       </p>
     );
   }
-  
+
   const info = GESTURES[label as BaseLabel];
 
   return (
