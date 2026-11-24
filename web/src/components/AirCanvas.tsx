@@ -1,13 +1,12 @@
-import type { RefObject } from 'react';
-import { GESTURES, type BaseLabel } from '../config';
 import type { AirCanvasEngine, EngineSnapshot } from '../engine/engine';
-
+import { GESTURES, type BaseLabel } from '../config';
+import Maybe from '../maybe';
+import type { RefObject } from 'react';
 export interface StageRefs {
   video: RefObject<HTMLVideoElement | null>;
   ink: RefObject<HTMLCanvasElement | null>;
   overlay: RefObject<HTMLCanvasElement | null>;
 }
-
 interface Props {
   engine: AirCanvasEngine | null;
   snap: EngineSnapshot;
@@ -15,9 +14,29 @@ interface Props {
   refs: StageRefs;
 }
 
+type StageCtaProps = {
+  engine: AirCanvasEngine | null;
+  snap: EngineSnapshot;
+  live: boolean;
+  busy: boolean;
+  reducedMotion: boolean;
+};
+
 export function AirCanvas({ engine, snap, reducedMotion, refs }: Props) {
   const live = snap.mode === 'camera';
   const busy = snap.mode === 'loading' || snap.mode === 'camera-starting';
+
+  const SOURCE_TEXT = new Map<EngineSnapshot['mode'], (snap: EngineSnapshot) => string>([
+    ['demo', () => 'Live Demo'],
+    ['camera', (snap) => (snap.handPresent ? 'Tracking your hand' : 'Hold one hand up to the camera')],
+    ['camera-starting', () => 'Starting the camera'],
+    ['loading', () => 'Loading'],
+  ]);
+
+  const sourceText = (snap: EngineSnapshot): string =>
+    Maybe.of(SOURCE_TEXT.get(snap.mode))
+      .map((format) => format(snap))
+      .orElseGet('Paused');
 
   return (
     <div
@@ -41,27 +60,14 @@ export function AirCanvas({ engine, snap, reducedMotion, refs }: Props) {
         </p>
       )}
 
-      {!live && (
-        <div className="stage-cta">
-          {busy ? (
-            <p className="stage-wait" role="status">
-              {snap.status}
-            </p>
-          ) : (
-            <>
-              <button type="button" className="button button-primary" onClick={() => void engine?.startCamera()} disabled={!engine || snap.mode === 'error'}>
-                Use your camera
-              </button>
-              {snap.mode === 'ready' && (
-                <button type="button" className="button" onClick={() => void engine?.startDemo()}>
-                  {reducedMotion ? 'Play the demo' : 'Replay the demo'}
-                </button>
-              )}
-              <p className="stage-note">Video stays on this device. Nothing is uploaded.</p>
-            </>
-          )}
-        </div>
-      )}
+      <StageCta
+        engine={engine}
+        snap={snap}
+        live={live}
+        busy={busy}
+        reducedMotion={reducedMotion}
+      />
+
       {snap.error && (
         <p className="stage-error" role="alert">
           {snap.error}
@@ -71,24 +77,11 @@ export function AirCanvas({ engine, snap, reducedMotion, refs }: Props) {
   );
 }
 
-function sourceText(snap: EngineSnapshot): string {
-  switch (snap.mode) {
-    case 'demo':
-      return 'Live Demo';
-    case 'camera':
-      return snap.handPresent ? 'Tracking your hand' : 'Hold one hand up to the camera';
-    case 'camera-starting':
-      return 'Starting the camera';
-    case 'loading':
-      return 'Loading';
-    default:
-      return 'Paused';
-  }
-}
-
 function ActiveGesture({ snap }: { snap: EngineSnapshot }) {
   const label = snap.active;
+
   if (!label || label === 'idle' || !snap.handPresent) return null;
+
   if (label.startsWith('custom:')) {
     const g = snap.customs.find((c) => `custom:${c.id}` === label);
     return (
@@ -98,11 +91,48 @@ function ActiveGesture({ snap }: { snap: EngineSnapshot }) {
       </p>
     );
   }
+  
   const info = GESTURES[label as BaseLabel];
+
   return (
     <p className="active-gesture">
       <span className="active-name">{info.name}</span>
       <span className="active-does">{info.does}</span>
     </p>
+  );
+}
+
+function StageCta({ engine, snap, live, busy, reducedMotion }: StageCtaProps) {
+  if (live) return null;
+
+  if (busy) {
+    return (
+      <div className="stage-cta">
+        <p className="stage-wait" role="status">
+          {snap.status}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="stage-cta">
+      <button
+        type="button"
+        className="button button-primary"
+        onClick={() => void engine?.startCamera()}
+        disabled={!engine || snap.mode === 'error'}
+      >
+        Use your camera
+      </button>
+
+      {snap.mode === 'ready' && (
+        <button type="button" className="button" onClick={() => void engine?.startDemo()}>
+          {reducedMotion ? 'Play the demo' : 'Replay the demo'}
+        </button>
+      )}
+
+      <p className="stage-note">Video stays on this device. Nothing is uploaded.</p>
+    </div>
   );
 }
